@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -eu
+set -o pipefail
+
+bindir=$(realpath "$(dirname "$0")")
+
+. "$bindir"/functions.bash
+
+USAGE="Usage: $0"
+
+go() {
+  local env
+  for env in tst acc prd; do
+    cmd docker image tag fb-main:{latest,"$env"}
+  done
+}; go
