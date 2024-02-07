@@ -1,0 +1,21 @@
+{
+  "packageManager": "yarn@4.1.0",
+  "devDependencies": {
+    "@babel/cli": "^7.23.9",
+    "@babel/core": "^7.23.9",
+    "@babel/eslint-parser": "^7.23.10",
+    "@babel/plugin-transform-runtime": "^7.23.9",
+    "@babel/preset-env": "^7.23.9",
+    "babel-plugin-alleycat-stick-transforms": "^0.9.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-import": "^2.29.1"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.23.9",
+    "alleycat-js": "^0.4.14",
+    "bilby": "^0.0.2",
+    "daggy": "^1.5.0",
+    "fish-lib": "^0.10.5",
+    "stick-js": "^0.5.2"
+  }
+}

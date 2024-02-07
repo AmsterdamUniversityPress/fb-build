@@ -1,40 +1,7 @@
-sources/*
-!sources/.empty
-
-web/db/*
-!web/db/.empty
-
-web/htdocs/legacy/js/generate/*
-!web/htdocs/legacy/js/generate/.empty
-web/htdocs/analyse/**/build
-web/htdocs/main/**/build
-
-tmp/*
-
-frontend/analyse/**/build/
-frontend/main/**/build/
+daemon/lib
 
 node_modules
-stats.json
-
-__pycache__
-*.pyc
-.pytest_cache
-.cache
-
 .eslintcache
-
-TAGS
-*.swo
-*.swp
-
-config/config_local.py
-config/config_user.py
-config/config_build.py
-
-lib/grne/query_parser/antlr4_parser
-
-server/logs
 
 **/.yarn/*
 !**/.yarn/patches
@@ -44,4 +11,6 @@ server/logs
 !**/.yarn/version
 yarn-error.log
 
-.fish-tree-files
+TAGS
+*.swo
+*.swp
