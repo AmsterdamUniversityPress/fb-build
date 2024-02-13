@@ -1,6 +1,7 @@
 import {
   pipe, compose, composeRight,
   die, lets, map, dot1,
+  whenPredicate, ne,
 } from 'stick-js/es'
 
 import fsP from 'node:fs/promises'
@@ -19,6 +20,8 @@ import { cmdPCwd, info, warn, } from './io.mjs'
 const recoverFail = (decorate) => recover (rejectP << decorateRejection (decorate))
 const regardless = dot1 ('finally')
 
+const whenNe = ne >> whenPredicate
+
 // --- run promises in sequence. Each `f` returns a promise. (This is
 // different than Promise.all, or our allP, which take promises, not
 // functions. But we need the extra laziness to avoid the promises starting
@@ -30,6 +33,9 @@ const delayP = (ms, val=null) => new Promise ((res, _) =>
   setTimeout (() => res (val), ms),
 )
 
+// --- @todo
+const buildDirRoot = process.env.HOME + '/build'
+
 const stateType = daggy.taggedSum ('stateType', {
   Building: [],
   Idle: [],
@@ -40,6 +46,19 @@ const { Building, Idle, } = stateType
 
 const state = { current: Idle, }
 
+const mkdirExistsOkP = (dir) => fsP.mkdir (dir)
+  | recover ((e) => e.code | whenNe ('EEXIST') (
+    () => rejectP (
+      e | decorateRejection ('Unable to create directory:'),
+    ),
+  ))
+  | then (() => dir)
+
+const prepareBuildDir = () => startP ()
+  | then (() => mkdirExistsOkP (buildDirRoot))
+  | then ((dir) => fsP.mkdtemp (dir + '/'))
+  | recover (rejectP << decorateRejection ('Error: prepareBuildDir (): '))
+
 export const start = () => state.current | cata ({
   Building: () => {
     info ('build in progress, ignoring trigger')
@@ -47,23 +66,27 @@ export const start = () => state.current | cata ({
   },
   Idle: () => {
     state.current = Building
-    info ('starting new build')
     const toIdle = () => state.current = Idle
-    return go ()
+    return prepareBuildDir ()
+    | then ((buildDir) => {
+      info ('starting new build, working dir =', buildDir)
+      return go (buildDir)
+    })
     | regardless (() => toIdle ())
     | then (() => info ('build completed successfully!'))
     | recoverFail ('Aborting: ')
+
     // --- @todo
     // | recoverAndBounce ((_) => toIdle ())
   },
 })
 
 // --- @todo
-const [d, e] = lets (
+const [d, f] = lets (
   () => process.env.HOME + '/src/fb',
   (pref) => [
     pref + '/fb-ingest/fb_ingest',
-    pref + '/fb-site/_data/fb.json',
+    '/home/upload',
   ],
 )
 
@@ -81,20 +104,22 @@ const fbIngest = () => {
   )
 }
 
-const buildEnv = (env) => {
+const buildEnv = (env, outputJson) => {
   info ('building env:', env)
+  info ('output:', outputJson)
   return startP ()
   | then (() => fbIngest ())
   | recoverFail ('Error with fb-ingest: ')
-  | then (({ stdout: json, }) => fsP.writeFile (e, json))
+  | then (({ stdout: json, }) => fsP.writeFile (outputJson, json))
   | recoverFail ('Error writing json: ')
   | then (() => buildEleventy ())
   | recoverFail ('Error building eleventy: ')
   | recoverFail (`Error building env ${env}: `)
 }
 
-const go = () => seq (
-  () => buildEnv ('tst'),
-  () => buildEnv ('acc'),
-  () => buildEnv ('prd'),
+const go = (buildDir) => seq (
+  // () => makeCsv (f, ),
+  () => buildEnv ('tst', buildDir + '/fb-tst.json'),
+  () => buildEnv ('acc', buildDir + '/fb-acc.json'),
+  () => buildEnv ('prd', buildDir + '/fb-prd.json'),
 )
