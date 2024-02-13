@@ -1,19 +1,21 @@
 import {
   pipe, compose, composeRight,
-  die, lets, map, dot1,
-  whenPredicate, ne,
+  die, lets, map, dot1, id,
+  whenPredicate, ne, tryCatch, not,
+  sprintfN, join,
 } from 'stick-js/es'
 
+import fs from 'node:fs'
 import fsP from 'node:fs/promises'
 
 import daggy from 'daggy'
 import fishLib from 'fish-lib'
 
-import { then, recover, recoverAndBounce, rejectP, startP, } from 'alleycat-js/es/async'
+import { then, recover, recoverAndBounce, resolveP, rejectP, startP, } from 'alleycat-js/es/async'
 import { cata, } from 'alleycat-js/es/bilby'
 import { composeManyRight, decorateRejection, } from 'alleycat-js/es/general'
 
-import { cmdPCwd, info, warn, } from './io.mjs'
+import { cmdP, cmdPCwd, info, magenta, warn, yellow, } from './io.mjs'
 
 // --- catch a promise rejection, decorate it, and re-reject.
 // --- @todo alleycat-js, combine with recoverAndBounce
@@ -57,9 +59,66 @@ const mkdirExistsOkP = (dir) => fsP.mkdir (dir)
 const prepareBuildDir = () => startP ()
   | then (() => mkdirExistsOkP (buildDirRoot))
   | then ((dir) => fsP.mkdtemp (dir + '/'))
-  | recover (rejectP << decorateRejection ('Error: prepareBuildDir (): '))
+  | recover (rejectP << decorateRejection ('prepareBuildDir (): '))
 
-export const start = () => state.current | cata ({
+// --- we could potentially want to handle the data differently per
+// environment, but at the moment the environment is ignored.
+const fbIngest = (env, csvFile) => {
+  info ([yellow (env), magenta (csvFile)] | sprintfN (
+    'doing fb-ingest for env=%s, csv-file=%s',
+  ))
+  return cmdP ('fb-ingest', csvFile)
+}
+
+const ls = (dir) => tryCatch (
+  id,
+  decorateRejection ('ls (): '),
+  () => fs.readdirSync (dir),
+)
+
+const makeCsv = (buildDir, zipPath) => {
+  info ('makeCsv', buildDir, zipPath)
+  let unzipDir, xlsx
+  return startP ()
+  | then (() => fsP.mkdtemp (buildDir + '/'))
+  | then ((dir) => unzipDir = dir)
+  | then (() => cmdPCwd (unzipDir) ('unzip', zipPath))
+  | then (() => {
+    const files = ls (unzipDir)
+    const n = files.length
+    if (n !== 1) die ('makeCsv (): expected exactly 1 file in zip file, got', n)
+    const last = files [0]
+    if (not (last.match (/.xlsx$/i))) warn ('Expected .xlsx extension, got filename', last)
+    xlsx = last
+    return cmdPCwd (unzipDir) ('libreoffice', '--convert-to', 'csv', xlsx)
+  })
+  | then (() => join ('/', [
+    unzipDir,
+    xlsx.replace (/\.[^.]*$/, '.csv'),
+  ]))
+  | recover (rejectP << decorateRejection ('makeCsv (): '))
+}
+
+const buildEnv = (env, csvFile, outputJson) => {
+  info ('building env:', env)
+  return startP ()
+  | then (() => fbIngest (env, csvFile))
+  | recoverFail ('Error with fb-ingest: ')
+  | then (({ stdout: json, }) => fsP.writeFile (outputJson, json))
+  | recoverFail ('Error writing json: ')
+  | recoverFail (`Error building env ${env}: `)
+}
+
+const go = (buildDir, zipPath) => {
+  return makeCsv (buildDir, zipPath)
+  | then ((csvFile) => seq (
+    () => buildEnv ('tst', csvFile, buildDir + '/fb-tst.json'),
+    () => buildEnv ('acc', csvFile, buildDir + '/fb-acc.json'),
+    () => buildEnv ('prd', csvFile, buildDir + '/fb-prd.json'),
+  ))
+}
+
+export const start = (zipPath) => state.current | cata ({
   Building: () => {
     info ('build in progress, ignoring trigger')
     return null
@@ -69,8 +128,8 @@ export const start = () => state.current | cata ({
     const toIdle = () => state.current = Idle
     return prepareBuildDir ()
     | then ((buildDir) => {
-      info ('starting new build, working dir =', buildDir)
-      return go (buildDir)
+      info ('starting new build, working dir =', buildDir, 'zipfile =', zipPath)
+      return go (buildDir, zipPath)
     })
     | regardless (() => toIdle ())
     | then (() => info ('build completed successfully!'))
@@ -80,46 +139,3 @@ export const start = () => state.current | cata ({
     // | recoverAndBounce ((_) => toIdle ())
   },
 })
-
-// --- @todo
-const [d, f] = lets (
-  () => process.env.HOME + '/src/fb',
-  (pref) => [
-    pref + '/fb-ingest/fb_ingest',
-    '/home/upload',
-  ],
-)
-
-// --- @todo
-const buildEleventy = () => {
-  info ('building eleventy')
-  return null
-}
-
-const fbIngest = () => {
-  info ('doing fb-ingest')
-  return cmdPCwd (d) (
-    // --- @todo
-    'fb-ingest', '/tmp/fonds.csv',
-  )
-}
-
-const buildEnv = (env, outputJson) => {
-  info ('building env:', env)
-  info ('output:', outputJson)
-  return startP ()
-  | then (() => fbIngest ())
-  | recoverFail ('Error with fb-ingest: ')
-  | then (({ stdout: json, }) => fsP.writeFile (outputJson, json))
-  | recoverFail ('Error writing json: ')
-  | then (() => buildEleventy ())
-  | recoverFail ('Error building eleventy: ')
-  | recoverFail (`Error building env ${env}: `)
-}
-
-const go = (buildDir) => seq (
-  // () => makeCsv (f, ),
-  () => buildEnv ('tst', buildDir + '/fb-tst.json'),
-  () => buildEnv ('acc', buildDir + '/fb-acc.json'),
-  () => buildEnv ('prd', buildDir + '/fb-prd.json'),
-)

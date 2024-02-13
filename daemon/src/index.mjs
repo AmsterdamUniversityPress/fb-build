@@ -11,14 +11,32 @@ import fsP from 'node:fs/promises'
 import path from 'node:path'
 
 import { then, recover, rejectP, startP, } from 'alleycat-js/es/async'
-import { decorateRejection, } from 'alleycat-js/es/general'
+import { decorateRejection, toString, } from 'alleycat-js/es/general'
 
 import { start as startBuild, } from './build.mjs'
 import { info, warn, } from './io.mjs'
 
-const trigger = (source) => {
-  info (`triggered by ${source}`)
-  return startBuild ()
+const chomp = (x) => x.replace (/\n$/, '')
+
+const goPath = ['/tmp', 'go']
+
+const trigger = (sourceDesc, zipPath, removeFile=null) => {
+  info (`triggered by ${sourceDesc}`)
+  const cleanup = (file) => tryCatch (
+    () => info ('removed', file),
+    warn << decorateRejection ([file] | sprintfN ('Unable to remove %s: ')),
+    () => fs.unlinkSync (file),
+  )
+  return startBuild (zipPath)
+  | ifNil (
+    () => info ('not starting build'),
+    (p) => {
+      return p
+      // | then (() => removeFile && cleanup (removeFile))
+      | then (() => null)
+      | recover (rejectP << decorateRejection ('Build failed: '))
+    },
+  )
 }
 
 const go = async (dir, { created=noop, deleted=noop, }) => {
@@ -41,25 +59,13 @@ const go = async (dir, { created=noop, deleted=noop, }) => {
   }
 }
 
-const TMPDIR = '/tmp'
-go (TMPDIR, {
-  created: (filename, fullpath) => {
-    if (filename !== 'go') return
-    const cleanup = () => tryCatch (
-      () => info ('removed', fullpath),
-      warn << decorateRejection ([fullpath] | sprintfN ('Unable to remove %s: ')),
-      () => fs.unlinkSync (fullpath),
-    )
-    trigger ('go-file')
-    | ifNil (
-      () => info ('not starting build'),
-      (p) => {
-        return p
-        | then (() => cleanup ())
-        | recover ((e) => {
-          warn ('Build failed:', e.message || e)
-        })
-      },
-    )
+const [goDir, goFile] = goPath
+go (goDir, {
+  created: (goFilename, goFullpath) => {
+    if (goFilename !== goFile) return
+    fsP.readFile (goFullpath)
+    | then (chomp << toString)
+    | then ((zipPath) => trigger ('go-file', zipPath, goFullpath))
+    | recover ((e) => warn ('Build (trigger=go-file) failed:', e.message || e))
   },
 })
