@@ -19,6 +19,7 @@ import { info, warn, } from './io.mjs'
 const chomp = (x) => x.replace (/\n$/, '')
 
 const goPath = ['/tmp', 'go']
+const uploadDir = '/home/upload'
 
 const trigger = (sourceDesc, zipPath, removeFile=null) => {
   info (`triggered by ${sourceDesc}`)
@@ -32,8 +33,7 @@ const trigger = (sourceDesc, zipPath, removeFile=null) => {
     () => info ('not starting build'),
     (p) => {
       return p
-      // | then (() => removeFile && cleanup (removeFile))
-      | then (() => null)
+      | then (() => removeFile && cleanup (removeFile))
       | recover (rejectP << decorateRejection ('Build failed: '))
     },
   )
@@ -60,6 +60,9 @@ const go = async (dir, { created=noop, deleted=noop, }) => {
 }
 
 const [goDir, goFile] = goPath
+
+// --- triggers build using a file like /tmp/go, which must then contain the
+// path to the zip file.
 go (goDir, {
   created: (goFilename, goFullpath) => {
     if (goFilename !== goFile) return
@@ -68,4 +71,11 @@ go (goDir, {
     | then ((zipPath) => trigger ('go-file', zipPath, goFullpath))
     | recover ((e) => warn ('Build (trigger=go-file) failed:', e.message || e))
   },
+})
+
+go (uploadDir, {
+  created: (_zipFilename, zipFullpath) => {
+    trigger ('upload', zipFullpath, zipFullpath)
+    | recover ((e) => warn ('Build (trigger=upload) failed:', e.message || e))
+  }
 })
