@@ -38,10 +38,11 @@ const delayP = (ms, val=null) => new Promise ((res, _) =>
 
 // --- @todo
 // const buildDirRoot = process.env.HOME + '/build'
-const [buildDirRoot, buildDirLatestData] = lets (
-  () => __dirname (import.meta.url) + '/../../build',
-  (buildDir) => buildDir + '/latest-data',
-  (buildDir, buildDirLatestData) => [buildDir, buildDirLatestData],
+const [fbBuildRoot, buildDirRoot, buildDirLatestData] = lets (
+  () => __dirname (import.meta.url) + '/../..',
+  (fbBuildRoot) => fbBuildRoot + '/build',
+  (_, buildDir) => buildDir + '/latest-data',
+  (fbBuildRoot, buildDir, buildDirLatestData) => [fbBuildRoot, buildDir, buildDirLatestData],
 )
 
 const stateType = daggy.taggedSum ('stateType', {
@@ -103,8 +104,8 @@ const makeCsv = (buildDir, zipPath) => {
   | recover (rejectP << decorateRejection ('makeCsv (): '))
 }
 
-const buildEnv = (env, csvFile, outputJson, outputJsonLatest) => {
-  info ('building env:', env)
+const prepareData = (env, csvFile, outputJson, outputJsonLatest) => {
+  info ('preparing data for env', yellow (env))
   return startP ()
   | then (() => fbIngest (env, csvFile))
   | recoverFail ('Error with fb-ingest: ')
@@ -113,15 +114,22 @@ const buildEnv = (env, csvFile, outputJson, outputJsonLatest) => {
     fsP.writeFile (outputJsonLatest, json),
   ]))
   | recoverFail ('Error writing json: ')
-  | recoverFail (`Error building env ${env}: `)
+  | recoverFail (`Error preparing data for env ${env}: `)
 }
+
+const buildDockerImage = () => startP () |
+  then (() => cmdPCwd (fbBuildRoot) (
+    'docker', 'build', '--build-arg', 'CACHEBUST=$(date +%s)', '-t', 'fb-main', '.',
+  ))
+  | then (({ stdout, }) => console.log (stdout))
 
 const go = (buildDir, zipPath) => {
   return makeCsv (buildDir, zipPath)
   | then ((csvFile) => seq (
-    () => buildEnv ('tst', csvFile, buildDir + '/fb-tst.json', buildDirLatestData + '/fb-tst.json'),
-    () => buildEnv ('acc', csvFile, buildDir + '/fb-acc.json', buildDirLatestData + '/fb-acc.json'),
-    () => buildEnv ('prd', csvFile, buildDir + '/fb-prd.json', buildDirLatestData + '/fb-prd.json'),
+    () => prepareData ('tst', csvFile, buildDir + '/fb-tst.json', buildDirLatestData + '/fb-tst.json'),
+    () => prepareData ('acc', csvFile, buildDir + '/fb-acc.json', buildDirLatestData + '/fb-acc.json'),
+    () => prepareData ('prd', csvFile, buildDir + '/fb-prd.json', buildDirLatestData + '/fb-prd.json'),
+    () => buildDockerImage (),
   ))
 }
 
