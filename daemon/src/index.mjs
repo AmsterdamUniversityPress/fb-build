@@ -16,7 +16,7 @@ import { decorateRejection, toString, } from 'alleycat-js/es/general'
 import { start as startBuild, } from './build.mjs'
 import { info, warn, } from './io.mjs'
 
-const chomp = (x) => x.replace (/\n$/, '')
+const chomp = (x) => x.replace (/\n+$/, '')
 
 const goPath = ['/tmp', 'go']
 const uploadDir = '/home/upload'
@@ -39,7 +39,7 @@ const trigger = (sourceDesc, zipPath, removeFile=null) => {
   )
 }
 
-const go = async (dir, { created=noop, deleted=noop, }) => {
+const watch = async (dir, { created=noop, deleted=noop, }) => {
   const watcher = fsP.watch (dir)
   for await (const { eventType, filename, } of watcher) {
     const fullpath = path.join (dir, filename)
@@ -63,7 +63,7 @@ const [goDir, goFile] = goPath
 
 // --- triggers build using a file like /tmp/go, which must then contain the
 // path to the zip file.
-go (goDir, {
+watch (goDir, {
   created: (goFilename, goFullpath) => {
     if (goFilename !== goFile) return
     fsP.readFile (goFullpath)
@@ -73,7 +73,8 @@ go (goDir, {
   },
 })
 
-go (uploadDir, {
+// --- triggers build when a file appears in `uploadDir`
+watch (uploadDir, {
   created: (_zipFilename, zipFullpath) => {
     trigger ('upload', zipFullpath, zipFullpath)
     | recover ((e) => warn ('Build (trigger=upload) failed:', e.message || e))
