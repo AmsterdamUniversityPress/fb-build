@@ -1,43 +1,20 @@
 import {
   pipe, compose, composeRight,
-  die, lets, map, dot1, id,
-  whenPredicate, ne, tryCatch, not,
-  sprintfN, join, tap,
+  die, lets, not, sprintfN, join,
 } from 'stick-js/es'
 
-import fs from 'node:fs'
 import fsP from 'node:fs/promises'
 
 import daggy from 'daggy'
-import fishLib from 'fish-lib'
 
-import { allP, recover, recoverAndBounce, resolveP, rejectP, startP, then, } from 'alleycat-js/es/async'
+import { allP, recover, rejectP, startP, then, } from 'alleycat-js/es/async'
 import { cata, } from 'alleycat-js/es/bilby'
-import { composeManyRight, decorateRejection, logWith, } from 'alleycat-js/es/general'
+import { decorateRejection, } from 'alleycat-js/es/general'
 
-import { cmdP, cmdPCwd, info, magenta, warn, yellow, } from './io.mjs'
-import { __dirname, } from './util.mjs'
-
-// --- catch a promise rejection, decorate it, and re-reject.
-// --- @todo alleycat-js, combine with recoverAndBounce
-const recoverFail = (decorate) => recover (rejectP << decorateRejection (decorate))
-const regardless = dot1 ('finally')
-
-const whenNe = ne >> whenPredicate
-
-// --- run promises in sequence. Each `f` returns a promise. (This is
-// different than Promise.all, or our allP, which take promises, not
-// functions. But we need the extra laziness to avoid the promises starting
-// all at once).
-const seq = (... fs) => startP () | composeManyRight (
-  ... fs | map (then),
-)
-const delayP = (ms, val=null) => new Promise ((res, _) =>
-  setTimeout (() => res (val), ms),
-)
+import { cmdP, cmdPCwd, info, ls, magenta, mkdirExistsOkP, warn, yellow, } from './io.mjs'
+import { __dirname, recoverFail, regardless, seqP, } from './util.mjs'
 
 // --- @todo
-// const buildDirRoot = process.env.HOME + '/build'
 const [fbBuildRoot, buildDirRoot, buildDirLatestData] = lets (
   () => __dirname (import.meta.url) + '/../..',
   (fbBuildRoot) => fbBuildRoot + '/build',
@@ -54,12 +31,6 @@ const { Building, Idle, } = stateType
 
 const state = { current: Idle, }
 
-const mkdirExistsOkP = (dir) => fsP.mkdir (dir)
-  | recover ((e) => e.code | whenNe ('EEXIST') (
-    () => rejectP (e | decorateRejection ('Unable to create directory:')),
-  ))
-  | then (() => dir)
-
 const prepareBuildDir = () => startP ()
   | then (() => mkdirExistsOkP (buildDirRoot))
   | then (() => mkdirExistsOkP (buildDirLatestData))
@@ -74,12 +45,6 @@ const fbIngest = (env, csvFile) => {
   ))
   return cmdP ('fb-ingest', csvFile)
 }
-
-const ls = (dir) => tryCatch (
-  id,
-  decorateRejection ('ls (): '),
-  () => fs.readdirSync (dir),
-)
 
 const makeCsv = (buildDir, zipPath) => {
   info ('makeCsv', buildDir, zipPath)
@@ -117,15 +82,15 @@ const prepareData = (env, csvFile, outputJson, outputJsonLatest) => {
   | recoverFail (`Error preparing data for env ${env}: `)
 }
 
-const buildDockerImage = () => startP () |
-  then (() => cmdPCwd (fbBuildRoot) (
+const buildDockerImage = () => {
+  return cmdPCwd (fbBuildRoot) (
     'docker', 'build', '--build-arg', 'CACHEBUST=$(date +%s)', '-t', 'fb-main', '.',
-  ))
-  | then (({ stdout, }) => console.log (stdout))
+  ) | then (({ stdout, }) => console.log (stdout))
+}
 
 const go = (buildDir, zipPath) => {
   return makeCsv (buildDir, zipPath)
-  | then ((csvFile) => seq (
+  | then ((csvFile) => seqP (
     () => prepareData ('tst', csvFile, buildDir + '/fb-tst.json', buildDirLatestData + '/fb-tst.json'),
     () => prepareData ('acc', csvFile, buildDir + '/fb-acc.json', buildDirLatestData + '/fb-acc.json'),
     () => prepareData ('prd', csvFile, buildDir + '/fb-prd.json', buildDirLatestData + '/fb-prd.json'),

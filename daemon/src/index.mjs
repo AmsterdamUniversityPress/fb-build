@@ -2,21 +2,18 @@
 
 import {
   pipe, compose, composeRight,
-  condS, eq, guard, die, otherwise,
-  ifTrue, noop, tryCatch, sprintfN, ifNil,
+  tryCatch, sprintfN, ifNil,
 } from 'stick-js/es'
 
 import fs from 'node:fs'
 import fsP from 'node:fs/promises'
-import path from 'node:path'
 
-import { then, recover, rejectP, startP, } from 'alleycat-js/es/async'
+import { then, recover, rejectP, } from 'alleycat-js/es/async'
 import { decorateRejection, toString, } from 'alleycat-js/es/general'
 
 import { start as startBuild, } from './build.mjs'
 import { info, warn, } from './io.mjs'
-
-const chomp = (x) => x.replace (/\n+$/, '')
+import { chomp, watchDir, } from './util.mjs'
 
 const goPath = ['/tmp', 'go']
 const uploadDir = '/home/upload'
@@ -39,31 +36,11 @@ const trigger = (sourceDesc, zipPath, removeFile=null) => {
   )
 }
 
-const watch = async (dir, { created=noop, deleted=noop, }) => {
-  const watcher = fsP.watch (dir)
-  for await (const { eventType, filename, } of watcher) {
-    const fullpath = path.join (dir, filename)
-    eventType | condS ([
-      // --- a file was created or deleted
-      eq ('rename') | guard (() => {
-        fs.existsSync (fullpath) | ifTrue (
-          // --- file was created
-          () => created (filename, fullpath),
-          // --- file was deleted
-          () => deleted (filename, fullpath),
-        )
-      }),
-      eq ('change') | guard (() => {}),
-      otherwise | guard (() => die ('unexpected')),
-    ])
-  }
-}
-
 const [goDir, goFile] = goPath
 
 // --- triggers build using a file like /tmp/go, which must then contain the
 // path to the zip file.
-watch (goDir, {
+watchDir (goDir, {
   created: (goFilename, goFullpath) => {
     if (goFilename !== goFile) return
     fsP.readFile (goFullpath)
@@ -74,7 +51,7 @@ watch (goDir, {
 })
 
 // --- triggers build when a file appears in `uploadDir`
-watch (uploadDir, {
+watchDir (uploadDir, {
   created: (_zipFilename, zipFullpath) => {
     trigger ('upload', zipFullpath, zipFullpath)
     | recover ((e) => warn ('Build (trigger=upload) failed:', e.message || e))
