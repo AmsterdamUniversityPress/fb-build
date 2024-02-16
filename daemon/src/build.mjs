@@ -2,7 +2,7 @@ import {
   pipe, compose, composeRight,
   die, lets, map, dot1, id,
   whenPredicate, ne, tryCatch, not,
-  sprintfN, join,
+  sprintfN, join, tap,
 } from 'stick-js/es'
 
 import fs from 'node:fs'
@@ -11,11 +11,12 @@ import fsP from 'node:fs/promises'
 import daggy from 'daggy'
 import fishLib from 'fish-lib'
 
-import { then, recover, recoverAndBounce, resolveP, rejectP, startP, } from 'alleycat-js/es/async'
+import { allP, recover, recoverAndBounce, resolveP, rejectP, startP, then, } from 'alleycat-js/es/async'
 import { cata, } from 'alleycat-js/es/bilby'
-import { composeManyRight, decorateRejection, } from 'alleycat-js/es/general'
+import { composeManyRight, decorateRejection, logWith, } from 'alleycat-js/es/general'
 
 import { cmdP, cmdPCwd, info, magenta, warn, yellow, } from './io.mjs'
+import { __dirname, } from './util.mjs'
 
 // --- catch a promise rejection, decorate it, and re-reject.
 // --- @todo alleycat-js, combine with recoverAndBounce
@@ -36,7 +37,12 @@ const delayP = (ms, val=null) => new Promise ((res, _) =>
 )
 
 // --- @todo
-const buildDirRoot = process.env.HOME + '/build'
+// const buildDirRoot = process.env.HOME + '/build'
+const [buildDirRoot, buildDirLatestData] = lets (
+  () => __dirname (import.meta.url) + '/../../build',
+  (buildDir) => buildDir + '/latest-data',
+  (buildDir, buildDirLatestData) => [buildDir, buildDirLatestData],
+)
 
 const stateType = daggy.taggedSum ('stateType', {
   Building: [],
@@ -44,21 +50,19 @@ const stateType = daggy.taggedSum ('stateType', {
 })
 
 const { Building, Idle, } = stateType
-// export { Building, Idle, }
 
 const state = { current: Idle, }
 
 const mkdirExistsOkP = (dir) => fsP.mkdir (dir)
   | recover ((e) => e.code | whenNe ('EEXIST') (
-    () => rejectP (
-      e | decorateRejection ('Unable to create directory:'),
-    ),
+    () => rejectP (e | decorateRejection ('Unable to create directory:')),
   ))
   | then (() => dir)
 
 const prepareBuildDir = () => startP ()
   | then (() => mkdirExistsOkP (buildDirRoot))
-  | then ((dir) => fsP.mkdtemp (dir + '/'))
+  | then (() => mkdirExistsOkP (buildDirLatestData))
+  | then (() => fsP.mkdtemp (buildDirRoot + '/'))
   | recover (rejectP << decorateRejection ('prepareBuildDir (): '))
 
 // --- we could potentially want to handle the data differently per
@@ -99,12 +103,15 @@ const makeCsv = (buildDir, zipPath) => {
   | recover (rejectP << decorateRejection ('makeCsv (): '))
 }
 
-const buildEnv = (env, csvFile, outputJson) => {
+const buildEnv = (env, csvFile, outputJson, outputJsonLatest) => {
   info ('building env:', env)
   return startP ()
   | then (() => fbIngest (env, csvFile))
   | recoverFail ('Error with fb-ingest: ')
-  | then (({ stdout: json, }) => fsP.writeFile (outputJson, json))
+  | then (({ stdout: json, }) => allP ([
+    fsP.writeFile (outputJson, json),
+    fsP.writeFile (outputJsonLatest, json),
+  ]))
   | recoverFail ('Error writing json: ')
   | recoverFail (`Error building env ${env}: `)
 }
@@ -112,9 +119,9 @@ const buildEnv = (env, csvFile, outputJson) => {
 const go = (buildDir, zipPath) => {
   return makeCsv (buildDir, zipPath)
   | then ((csvFile) => seq (
-    () => buildEnv ('tst', csvFile, buildDir + '/fb-tst.json'),
-    () => buildEnv ('acc', csvFile, buildDir + '/fb-acc.json'),
-    () => buildEnv ('prd', csvFile, buildDir + '/fb-prd.json'),
+    () => buildEnv ('tst', csvFile, buildDir + '/fb-tst.json', buildDirLatestData + '/fb-tst.json'),
+    () => buildEnv ('acc', csvFile, buildDir + '/fb-acc.json', buildDirLatestData + '/fb-acc.json'),
+    () => buildEnv ('prd', csvFile, buildDir + '/fb-prd.json', buildDirLatestData + '/fb-prd.json'),
   ))
 }
 
