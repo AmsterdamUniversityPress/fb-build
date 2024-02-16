@@ -27,14 +27,12 @@ RUN cd /fb-site && yarn
 # ARG CACHEBUST
 # RUN echo "$CACHEBUST"
 
-RUN cd /fb-site && git pull && git reset --hard f1bdf8a
+RUN cd /fb-site && git pull && git reset --hard aeb1b52
 RUN cd /fb-site && yarn
 
 COPY build/latest-data/fb-tst.json /fb-site/__data/fb-data-tst.json
 COPY build/latest-data/fb-acc.json /fb-site/__data/fb-data-acc.json
 COPY build/latest-data/fb-prd.json /fb-site/__data/fb-data-prd.json
-
-RUN cd /fb-site && FB_ENV=tst npx @11ty/eleventy
 
 COPY functions.bash /
 COPY start.sh /start.sh
