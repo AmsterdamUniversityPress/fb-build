@@ -57,3 +57,5 @@ watchDir (uploadDir, {
     | recover ((e) => warn ('Build (trigger=upload) failed:', e.message || e))
   }
 })
+
+info ('ready')

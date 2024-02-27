@@ -9,7 +9,7 @@ import daggy from 'daggy'
 
 import { allP, recover, rejectP, startP, then, } from 'alleycat-js/es/async'
 import { cata, } from 'alleycat-js/es/bilby'
-import { decorateRejection, } from 'alleycat-js/es/general'
+import { decorateRejection, setTimeoutOn, } from 'alleycat-js/es/general'
 
 import { cmdP, cmdPCwd, info, ls, magenta, mkdirExistsOkP, warn, yellow, } from './io.mjs'
 import { __dirname, recoverFail, regardless, seqP, } from './util.mjs'
@@ -46,13 +46,31 @@ const fbIngest = (env, csvFile) => {
   return cmdP ('fb-ingest', csvFile)
 }
 
+const numTimes = 10
+const tryInterval = 10000
+
+// --- try numTimes times, with an interval of tryInterval
+const unzip = (dir, zipPath) => new Promise ((res, rej) => {
+  const f = (tryIdx) => {
+    if (tryIdx === 0) return rej ('Gave up after ' + String (numTimes) + ' tries')
+    const g = () => cmdPCwd (dir) ('unzip', zipPath)
+    | then (() => res ())
+    | recover ((e) => {
+      warn (e)
+      tryInterval | setTimeoutOn (() => f (tryIdx - 1))
+    })
+    tryInterval | setTimeoutOn (g)
+  }
+  f (numTimes)
+})
+
 const makeCsv = (buildDir, zipPath) => {
   info ('makeCsv', buildDir, zipPath)
   let unzipDir, xlsx
   return startP ()
   | then (() => fsP.mkdtemp (buildDir + '/'))
   | then ((dir) => unzipDir = dir)
-  | then (() => cmdPCwd (unzipDir) ('unzip', zipPath))
+  | then (() => unzip (unzipDir, zipPath))
   | then (() => {
     const files = ls (unzipDir)
     const n = files.length
