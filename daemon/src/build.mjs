@@ -46,22 +46,23 @@ const fbIngest = (env, csvFile) => {
   return cmdP ('fb-ingest', csvFile)
 }
 
-const numTimes = 10
-const tryInterval = 10000
+const UNZIP_NUM_RETRIES = 10
+const UNZIP_TRY_INTERVAL = 10000
+const DOCKER_IMAGE = 'fb-main'
 
 // --- try numTimes times, with an interval of tryInterval
 const unzip = (dir, zipPath) => new Promise ((res, rej) => {
   const f = (tryIdx) => {
-    if (tryIdx === 0) return rej ('Gave up after ' + String (numTimes) + ' tries')
+    if (tryIdx === 0) return rej ('Gave up after ' + String (UNZIP_NUM_RETRIES) + ' tries')
     const g = () => cmdPCwd (dir) ('unzip', zipPath)
     | then (() => res ())
     | recover ((e) => {
       warn (e)
-      tryInterval | setTimeoutOn (() => f (tryIdx - 1))
+      UNZIP_TRY_INTERVAL | setTimeoutOn (() => f (tryIdx - 1))
     })
-    tryInterval | setTimeoutOn (g)
+    UNZIP_TRY_INTERVAL | setTimeoutOn (g)
   }
-  f (numTimes)
+  f (UNZIP_NUM_RETRIES)
 })
 
 const makeCsv = (buildDir, zipPath) => {
@@ -106,7 +107,7 @@ const buildDockerImage = () => {
   ) | then (({ stdout, }) => console.log (stdout))
 }
 
-const go = (buildDir, zipPath) => {
+const doBuild = (buildDir, zipPath) => {
   return makeCsv (buildDir, zipPath)
   | then ((csvFile) => seqP (
     () => prepareData ('tst', csvFile, buildDir + '/fb-tst.json', buildDirLatestData + '/fb-tst.json'),
@@ -115,6 +116,12 @@ const go = (buildDir, zipPath) => {
     () => buildDockerImage (),
   ))
 }
+
+const deploy = (env) => lets (
+  () => DOCKER_IMAGE + ':latest',
+  () => DOCKER_IMAGE + ':' + env,
+  (from, to) => cmdP ('docker', 'image', 'tag', from, to),
+)
 
 export const start = (zipPath) => state.current | cata ({
   Building: () => {
@@ -127,10 +134,12 @@ export const start = (zipPath) => state.current | cata ({
     return prepareBuildDir ()
     | then ((buildDir) => {
       info ('starting new build, working dir =', buildDir, 'zipfile =', zipPath)
-      return go (buildDir, zipPath)
+      return doBuild (buildDir, zipPath)
     })
+    | then (() => info ('build completed successfully, deploying'))
+    | then (() => deploy ('tst'))
+    | then (() => info ('all done!'))
     | regardless (() => toIdle ())
-    | then (() => info ('build completed successfully!'))
     | recoverFail ('Aborting: ')
 
     // --- @todo
