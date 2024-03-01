@@ -13,6 +13,7 @@ run() {
   cmd python3 -mhttp.server 8080 "$@"
 }
 
-# --- assumes FB_ENV has already been set.
-cwd /fb-site npx @11ty/eleventy
-cwd /fb-site/_site run "$@"
+# --- assumes APP_ENV has already been set.
+cwd /fb-site bin/run-backend-dev &
+sleep 5
+cwd /fb-site/frontend/build-"$APP_ENV" run "$@"

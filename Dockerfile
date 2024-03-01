@@ -22,17 +22,22 @@ RUN apt install --no-install-recommends -y \
 RUN corepack enable
 
 RUN git clone https://github.com/AmsterdamUniversityPress/fb-site.git /fb-site
-RUN cd /fb-site && yarn
 
+# --- keep for now, though not currently useful
 # ARG CACHEBUST
 # RUN echo "$CACHEBUST"
 
-RUN cd /fb-site && git pull && git reset --hard aeb1b52
+RUN cd /fb-site && git pull && git submodule update --init --recursive && git reset --hard 70f9cea
 RUN cd /fb-site && yarn
+RUN cd /fb-site && bin/build-backend
 
 COPY build/latest-data/fb-tst.json /fb-site/__data/fb-data-tst.json
 COPY build/latest-data/fb-acc.json /fb-site/__data/fb-data-acc.json
 COPY build/latest-data/fb-prd.json /fb-site/__data/fb-data-prd.json
+
+RUN cd /fb-site/frontend && APP_ENV=tst npx alleycat-frontend --app-dir=app --config-file=config.mjs build-tst --build-dir=build-tst
+RUN cd /fb-site/frontend && APP_ENV=acc npx alleycat-frontend --app-dir=app --config-file=config.mjs build-acc --build-dir=build-acc
+RUN cd /fb-site/frontend && APP_ENV=prd npx alleycat-frontend --app-dir=app --config-file=config.mjs build-prd --build-dir=build-prd
 
 COPY functions.bash /
 COPY start.sh /start.sh
