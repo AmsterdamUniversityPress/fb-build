@@ -14,6 +14,6 @@ run() {
 }
 
 # --- assumes APP_ENV has already been set.
-cwd /fb-site bin/run-backend-dev &
+cwd /fb-site bin/run-backend &
 sleep 5
 cwd /fb-site/frontend/build-"$APP_ENV" run "$@"
