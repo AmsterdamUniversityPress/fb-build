@@ -1,6 +1,8 @@
 daemon/lib
 build
 
+fb-site-config/config.mjs
+
 node_modules
 .eslintcache
 

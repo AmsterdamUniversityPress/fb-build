@@ -27,8 +27,11 @@ RUN git clone https://github.com/AmsterdamUniversityPress/fb-site.git /fb-site
 # ARG CACHEBUST
 # RUN echo "$CACHEBUST"
 
-RUN cd /fb-site && git pull && git submodule update --init --recursive && git reset --hard fc7f609
+RUN cd /fb-site && git pull && git submodule update --init --recursive && git reset --hard 0f713bb
 RUN cd /fb-site && yarn
+
+COPY fb-site-config/config.mjs /fb-site/backend/src/config.mjs
+
 RUN cd /fb-site && bin/build-backend
 
 COPY build/latest-data/fb-tst.json /fb-site/__data/fb-data-tst.json
