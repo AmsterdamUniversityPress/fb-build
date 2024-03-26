@@ -3,22 +3,18 @@ FROM debian:bookworm-20240110
 RUN apt update
 
 RUN apt install --no-install-recommends -y \
-  python3 \
-  procps \
-  curl vim-nox aptitude
+  ca-certificates
 
 RUN echo 'deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main' > /etc/apt/sources.list.d/nodesource.list
-
 COPY apt-keys/nodesource.gpg /usr/share/keyrings/nodesource.gpg
 
 RUN apt update
 
 RUN apt install --no-install-recommends -y \
-  nodejs
+  python3 nodejs git nginx \
+  procps curl vim-nox aptitude
 
-RUN apt install --no-install-recommends -y \
-  git
-
+# --- enable yarn
 RUN corepack enable
 
 RUN git clone https://github.com/AmsterdamUniversityPress/fb-site.git /fb-site
@@ -27,7 +23,7 @@ RUN git clone https://github.com/AmsterdamUniversityPress/fb-site.git /fb-site
 # ARG CACHEBUST
 # RUN echo "$CACHEBUST"
 
-RUN cd /fb-site && git pull && git submodule update --init --recursive && git reset --hard 0f713bb
+RUN cd /fb-site && git pull && git submodule update --init --recursive && git reset --hard abd84d9
 RUN cd /fb-site && yarn
 
 COPY fb-site-config/config.mjs /fb-site/backend/src/config.mjs
