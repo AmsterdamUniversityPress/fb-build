@@ -11,7 +11,7 @@ import { allP, recover, rejectP, startP, then, } from 'alleycat-js/es/async'
 import { cata, } from 'alleycat-js/es/bilby'
 import { decorateRejection, setTimeoutOn, } from 'alleycat-js/es/general'
 
-import { cmdP, cmdPCwd, info, ls, magenta, mkdirExistsOkP, warn, yellow, } from './io.mjs'
+import { cmdP, cmdPCwd, cmdPOptsFull, info, ls, magenta, mkdirExistsOkP, warn, yellow, } from './io.mjs'
 import { __dirname, recoverFail, regardless, seqP, } from './util.mjs'
 
 // --- @todo
@@ -102,9 +102,9 @@ const prepareData = (env, csvFile, outputJson, outputJsonLatest) => {
 }
 
 const buildDockerImage = () => {
-  return cmdPCwd (fbBuildRoot) (
+  return cmdPOptsFull ({ outPrint: true, }, { cwd: fbBuildRoot, }) (
     'docker', 'build', '--build-arg', 'CACHEBUST=$(date +%s)', '-t', 'fb-main', '.',
-  ) | then (({ stdout, }) => console.log (stdout))
+  )
 }
 
 const doBuild = (buildDir, zipPath) => {
@@ -124,10 +124,7 @@ const deploy = (env) => lets (
 )
 
 export const start = (zipPath) => state.current | cata ({
-  Building: () => {
-    info ('build in progress, ignoring trigger')
-    return null
-  },
+  Building: () => rejectP ('Build in progress, ignoring trigger'),
   Idle: () => {
     state.current = Building
     const toIdle = () => state.current = Idle

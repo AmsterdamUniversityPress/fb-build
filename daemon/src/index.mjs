@@ -8,7 +8,7 @@ import {
 import fs from 'node:fs'
 import fsP from 'node:fs/promises'
 
-import { then, recover, rejectP, } from 'alleycat-js/es/async'
+import { then, recover, rejectP, resolveP, } from 'alleycat-js/es/async'
 import { decorateRejection, toString, } from 'alleycat-js/es/general'
 
 import { start as startBuild, } from './build.mjs'
@@ -26,14 +26,8 @@ const trigger = (sourceDesc, zipPath, removeFile=null) => {
     () => fs.unlinkSync (file),
   )
   return startBuild (zipPath)
-  | ifNil (
-    () => info ('not starting build'),
-    (p) => {
-      return p
-      | then (() => removeFile && cleanup (removeFile))
-      | recover (rejectP << decorateRejection ('Build failed: '))
-    },
-  )
+  | then (() => removeFile && cleanup (removeFile))
+  | recover (rejectP << decorateRejection ('Build failed: '))
 }
 
 const [goDir, goFile] = goPath

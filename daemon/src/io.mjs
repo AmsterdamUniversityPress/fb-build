@@ -21,13 +21,14 @@ fishLib.forceColors ()
 fishLib.bulletSet ({ type: 'star', })
 
 // --- die = false, verbose = true, does not capture stderr
-const _cmdP = (cmd, args, invocationOpts={}) => new Promise ((res, rej) => {
+const _cmdP = (cmd, args, opts={}, invocationOpts={}) => new Promise ((res, rej) => {
   const o = fishLib.sysSpawn (
     cmd,
     args,
     {
       die: false,
       verbose: true,
+      ... opts,
       invocationOpts,
     },
     ({ code, ok, signal, stdout, stderr, }) => {
@@ -39,8 +40,10 @@ const _cmdP = (cmd, args, invocationOpts={}) => new Promise ((res, rej) => {
   )
 })
 
-export const cmdP = (cmd, ... args) => _cmdP (cmd, args)
-export const cmdPCwd = (cwd) => (cmd, ... args) => _cmdP (cmd, args, { cwd, })
+export const cmdPOptsFull = (opts, invocationOpts) => (cmd, ... args) => _cmdP (cmd, args, opts, invocationOpts)
+export const cmdPOpts = (opts) => cmdPOptsFull (opts, {})
+export const cmdPCwd = (cwd) => cmdPOptsFull ({}, { cwd, })
+export const cmdP = cmdPOptsFull ({}, {})
 
 export const mkdirExistsOkP = (dir) => fsP.mkdir (dir)
   | recover ((e) => e.code | whenNe ('EEXIST') (
