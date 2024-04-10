@@ -43,7 +43,23 @@ const _cmdP = (cmd, args, opts={}, invocationOpts={}) => new Promise ((res, rej)
 export const cmdPOptsFull = (opts, invocationOpts) => (cmd, ... args) => _cmdP (cmd, args, opts, invocationOpts)
 export const cmdPOpts = (opts) => cmdPOptsFull (opts, {})
 export const cmdPCwd = (cwd) => cmdPOptsFull ({}, { cwd, })
-export const cmdP = cmdPOptsFull ({}, {})
+export const cmdP = cmdPOpts ({})
+
+const _cmd = (cmd, args, opts={}, invocationOpts={}) => fishLib.sysSpawn (
+  cmd,
+  args,
+  {
+    sync: true,
+    die: false,
+    verbose: true,
+    ... opts,
+    invocationOpts,
+  },
+)
+
+export const cmdOptsFull = (opts, invocationOpts) => (cmd, ...args) => _cmd (cmd, args, opts, invocationOpts)
+export const cmdOpts = (opts) => cmdOptsFull (opts, {})
+export const cmd = cmdOpts ({})
 
 export const mkdirExistsOkP = (dir) => fsP.mkdir (dir)
   | recover ((e) => e.code | whenNe ('EEXIST') (
