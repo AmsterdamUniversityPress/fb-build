@@ -1,6 +1,7 @@
 import {
   pipe, compose, composeRight,
-  die, lets, not, sprintfN, join,
+  die, lets, not, sprintfN, join, nil, whenOk,
+  prop,
 } from 'stick-js/es'
 
 import fsP from 'node:fs/promises'
@@ -9,9 +10,11 @@ import daggy from 'daggy'
 
 import { allP, recover, rejectP, startP, then, } from 'alleycat-js/es/async'
 import { cata, } from 'alleycat-js/es/bilby'
-import { decorateRejection, setTimeoutOn, } from 'alleycat-js/es/general'
+import { decorateRejection, setTimeoutOn, trim, } from 'alleycat-js/es/general'
+import { blue, } from 'alleycat-js/es/io'
+import { isEmptyString, } from 'alleycat-js/es/predicate'
 
-import { cmdP, cmdPCwd, cmdPOptsFull, info, ls, magenta, mkdirExistsOkP, warn, yellow, } from './io.mjs'
+import { cmdP, cmdPCwd, cmdPOptsFull, cmd, info, ls, magenta, mkdirExistsOkP, warn, yellow, } from './io.mjs'
 import { __dirname, recoverFail, regardless, seqP, } from './util.mjs'
 
 // --- @todo
@@ -101,9 +104,20 @@ const prepareData = (env, csvFile, outputJson, outputJsonLatest) => {
   | recoverFail (`Error preparing data for env ${env}: `)
 }
 
-const buildDockerImage = () => {
-  return cmdPOptsFull ({ outPrint: true, }, { cwd: fbBuildRoot, }) (
+const buildDockerImage = async () => {
+  await cmdPOptsFull ({ outPrint: true, }, { cwd: fbBuildRoot, }) (
     'docker', 'build', '--file', 'Dockerfile-main', '--build-arg', 'CACHEBUST=$(date +%s)', '-t', 'fb-main', '.',
+  )
+  const fbSiteCommit = cmd (
+    'docker', 'run', '--rm', 'fb-main:latest', 'sh', '-c', 'cd fb-site && git rev-parse --short HEAD',
+  )
+  | prop ('stdout')
+  | whenOk (trim)
+  if (nil (fbSiteCommit) || isEmptyString (fbSiteCommit))
+    return warn ('Unable to determine fb-site commit')
+  info ('tagging new image with fb-site commit:', blue (fbSiteCommit))
+  cmd (
+    'docker', 'image', 'tag', 'fb-main:latest', 'fb-main:' + fbSiteCommit,
   )
 }
 
