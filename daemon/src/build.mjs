@@ -103,7 +103,7 @@ const prepareData = (env, csvFile, outputJson, outputJsonLatest) => {
 
 const buildDockerImage = () => {
   return cmdPOptsFull ({ outPrint: true, }, { cwd: fbBuildRoot, }) (
-    'docker', 'build', '--build-arg', 'CACHEBUST=$(date +%s)', '-t', 'fb-main', '.',
+    'docker', 'build', '--file', 'Dockerfile-main', '--build-arg', 'CACHEBUST=$(date +%s)', '-t', 'fb-main', '.',
   )
 }
 
