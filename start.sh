@@ -49,10 +49,13 @@ fun nginx-configure-main
 
 fun redis-configure "$APP_ENV"
 
-cmd service nginx start
+# cmd service nginx start
 cmd redis-server /etc/redis/redis.conf
 sleep 1
 fun forkit tail-with-tag 'nginx → access.log' /var/log/nginx/access.log
 fun forkit tail-with-tag 'nginx → error.log' /var/log/nginx/error.log
 
-cwd /fb-site bin/run-backend
+cwd /fb-site forkit bin/run-backend
+# --- use nginx as the main task so we can try to figure out why it's
+# stopping sometimes
+cmd nginx -g 'daemon off;'

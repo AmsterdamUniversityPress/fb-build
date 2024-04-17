@@ -106,7 +106,7 @@ const prepareData = (env, csvFile, outputJson, outputJsonLatest) => {
 
 const buildDockerImage = async () => {
   await cmdPOptsFull ({ outPrint: true, }, { cwd: fbBuildRoot, }) (
-    'docker', 'build', '--file', 'Dockerfile-main', '--build-arg', 'CACHEBUST=$(date +%s)', '-t', 'fb-main', '.',
+    'docker', 'build', '--file', 'Dockerfile-main', '--build-arg', 'CACHEBUST=' + String (Date.now ()), '-t', 'fb-main', '.',
   )
   const fbSiteCommit = cmd (
     'docker', 'run', '--rm', 'fb-main:latest', 'sh', '-c', 'cd fb-site && git rev-parse --short HEAD',
