@@ -139,7 +139,7 @@ const doDeploy = (env) => lets (
 )
 
 export const deploy = (env) => {
-  info ('Deploying ', yellow (env))
+  info ('Deploying', yellow (env))
   return doDeploy (env)
   | then (() => cmdP (... cmdClearNginxCache (env)))
   | recover (rejectP << decorateRejection ('Error on deploy: '))
