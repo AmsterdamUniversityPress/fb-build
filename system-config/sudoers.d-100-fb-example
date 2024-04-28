@@ -1,0 +1,5 @@
+<user/%group>	ALL = NOPASSWD: /bin/rm -rf <nginx-cache-dir>/tst/*
+<user/%group>	ALL = NOPASSWD: /bin/rm -rf <nginx-cache-dir>/acc/*
+<user/%group>	ALL = NOPASSWD: /bin/rm -rf <nginx-cache-dir>/prd/*
+
+<user/%group>	ALL = NOPASSWD: /bin/rm -f <upload-dir>/*.zip
