@@ -11,3 +11,4 @@
 <user/%group>	ALL = NOPASSWD: /bin/rm -rf <nginx-cache-dir>/prd/*
 
 <user/%group>	ALL = NOPASSWD: /bin/rm -f <upload-dir>/*.zip
+<user/%group>	ALL = NOPASSWD: /bin/rm -f <go-file-dir>/<go-file>
