@@ -138,9 +138,12 @@ const doDeploy = (env) => lets (
   (from, to) => cmdP ('docker', 'image', 'tag', from, to),
 )
 
-const deploy = (env) => doDeploy (env)
+export const deploy = (env) => {
+  info ('Deploying ', yellow (env))
+  return doDeploy (env)
   | then (() => cmdP (... cmdClearNginxCache (env)))
   | recover (rejectP << decorateRejection ('Error on deploy: '))
+}
 
 export const start = (zipPath) => state.current | cata ({
   Building: () => rejectP ('Build in progress, ignoring trigger'),
