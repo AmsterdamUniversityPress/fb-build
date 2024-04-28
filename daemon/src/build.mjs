@@ -22,11 +22,11 @@ import { __dirname, recoverFail, regardless, seqP, } from './util.mjs'
 const configTop = configure.init (config ())
 const {
   buildRoot, buildDir, buildLatestDataDir,
-  cmdIngest,
+  cmdClearNginxCache, cmdIngest,
   dockerImage, unzipNumRetries, unzipTryInterval,
 } = configTop.gets (
   'buildRoot', 'buildDir', 'buildLatestDataDir',
-  'cmdIngest',
+  'cmdClearNginxCache', 'cmdIngest',
   'dockerImage', 'unzipNumRetries', 'unzipTryInterval',
 )
 
@@ -132,11 +132,15 @@ const doBuild = (buildDir, zipPath) => {
   ))
 }
 
-const deploy = (env) => lets (
+const doDeploy = (env) => lets (
   () => dockerImage + ':latest',
   () => dockerImage + ':' + env,
   (from, to) => cmdP ('docker', 'image', 'tag', from, to),
 )
+
+const deploy = (env) => doDeploy (env)
+  | then (() => cmdP (... cmdClearNginxCache (env)))
+  | recover (rejectP << decorateRejection ('Error on deploy: '))
 
 export const start = (zipPath) => state.current | cata ({
   Building: () => rejectP ('Build in progress, ignoring trigger'),
