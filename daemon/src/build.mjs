@@ -10,19 +10,24 @@ import daggy from 'daggy'
 
 import { allP, recover, rejectP, startP, then, } from 'alleycat-js/es/async'
 import { cata, } from 'alleycat-js/es/bilby'
+import configure from 'alleycat-js/es/configure'
 import { decorateRejection, setTimeoutOn, trim, } from 'alleycat-js/es/general'
 import { blue, } from 'alleycat-js/es/io'
 import { isEmptyString, } from 'alleycat-js/es/predicate'
 
+import { config, } from './config.mjs'
 import { cmdP, cmdPCwd, cmdPOptsFull, cmd, info, ls, magenta, mkdirExistsOkP, warn, yellow, } from './io.mjs'
 import { __dirname, recoverFail, regardless, seqP, } from './util.mjs'
 
-// --- @todo
-const [fbBuildRoot, buildDirRoot, buildDirLatestData] = lets (
-  () => __dirname (import.meta.url) + '/../..',
-  (fbBuildRoot) => fbBuildRoot + '/build',
-  (_, buildDir) => buildDir + '/latest-data',
-  (fbBuildRoot, buildDir, buildDirLatestData) => [fbBuildRoot, buildDir, buildDirLatestData],
+const configTop = configure.init (config ())
+const {
+  buildRoot, buildDir, buildLatestDataDir,
+  cmdIngest,
+  dockerImage, unzipNumRetries, unzipTryInterval,
+} = configTop.gets (
+  'buildRoot', 'buildDir', 'buildLatestDataDir',
+  'cmdIngest',
+  'dockerImage', 'unzipNumRetries', 'unzipTryInterval',
 )
 
 const stateType = daggy.taggedSum ('stateType', {
@@ -35,37 +40,33 @@ const { Building, Idle, } = stateType
 const state = { current: Idle, }
 
 const prepareBuildDir = () => startP ()
-  | then (() => mkdirExistsOkP (buildDirRoot))
-  | then (() => mkdirExistsOkP (buildDirLatestData))
-  | then (() => fsP.mkdtemp (buildDirRoot + '/'))
+  | then (() => mkdirExistsOkP (buildDir))
+  | then (() => mkdirExistsOkP (buildLatestDataDir))
+  | then (() => fsP.mkdtemp (buildDir + '/'))
   | recover (rejectP << decorateRejection ('prepareBuildDir (): '))
 
 // --- we could potentially want to handle the data differently per
 // environment, but at the moment the environment is ignored.
 const fbIngest = (env, csvFile) => {
   info ([yellow (env), magenta (csvFile)] | sprintfN (
-    'doing fb-ingest for env=%s, csv-file=%s',
+    'running ingest for env=%s, csv-file=%s',
   ))
-  return cmdP ('fb-ingest', csvFile)
+  return cmdP (cmdIngest, csvFile)
 }
-
-const UNZIP_NUM_RETRIES = 10
-const UNZIP_TRY_INTERVAL = 10000
-const DOCKER_IMAGE = 'fb-main'
 
 // --- try numTimes times, with an interval of tryInterval
 const unzip = (dir, zipPath) => new Promise ((res, rej) => {
   const f = (tryIdx) => {
-    if (tryIdx === 0) return rej ('Gave up after ' + String (UNZIP_NUM_RETRIES) + ' tries')
+    if (tryIdx === 0) return rej ('Gave up after ' + String (unzipNumRetries) + ' tries')
     const g = () => cmdPCwd (dir) ('unzip', zipPath)
     | then (() => res ())
     | recover ((e) => {
       warn (e)
-      UNZIP_TRY_INTERVAL | setTimeoutOn (() => f (tryIdx - 1))
+      unzipTryInterval | setTimeoutOn (() => f (tryIdx - 1))
     })
-    UNZIP_TRY_INTERVAL | setTimeoutOn (g)
+    unzipTryInterval | setTimeoutOn (g)
   }
-  f (UNZIP_NUM_RETRIES)
+  f (unzipNumRetries)
 })
 
 const makeCsv = (buildDir, zipPath) => {
@@ -105,11 +106,11 @@ const prepareData = (env, csvFile, outputJson, outputJsonLatest) => {
 }
 
 const buildDockerImage = async () => {
-  await cmdPOptsFull ({ outPrint: true, }, { cwd: fbBuildRoot, }) (
-    'docker', 'build', '--file', 'Dockerfile-main', '--build-arg', 'CACHEBUST=' + String (Date.now ()), '-t', 'fb-main', '.',
+  await cmdPOptsFull ({ outPrint: true, }, { cwd: buildRoot, }) (
+    'docker', 'build', '--file', 'Dockerfile-main', '--build-arg', 'CACHEBUST=' + String (Date.now ()), '-t', dockerImage, '.',
   )
   const fbSiteCommit = cmd (
-    'docker', 'run', '--rm', 'fb-main:latest', 'sh', '-c', 'cd fb-site && git rev-parse --short HEAD',
+    'docker', 'run', '--rm', dockerImage + ':latest', 'sh', '-c', 'cd fb-site && git rev-parse --short HEAD',
   )
   | prop ('stdout')
   | whenOk (trim)
@@ -117,23 +118,23 @@ const buildDockerImage = async () => {
     return warn ('Unable to determine fb-site commit')
   info ('tagging new image with fb-site commit:', blue (fbSiteCommit))
   cmd (
-    'docker', 'image', 'tag', 'fb-main:latest', 'fb-main:' + fbSiteCommit,
+    'docker', 'image', 'tag', dockerImage + ':latest', dockerImage + ':' + fbSiteCommit,
   )
 }
 
 const doBuild = (buildDir, zipPath) => {
   return makeCsv (buildDir, zipPath)
   | then ((csvFile) => seqP (
-    () => prepareData ('tst', csvFile, buildDir + '/fb-tst.json', buildDirLatestData + '/fb-tst.json'),
-    () => prepareData ('acc', csvFile, buildDir + '/fb-acc.json', buildDirLatestData + '/fb-acc.json'),
-    () => prepareData ('prd', csvFile, buildDir + '/fb-prd.json', buildDirLatestData + '/fb-prd.json'),
+    () => prepareData ('tst', csvFile, buildDir + '/fb-tst.json', buildLatestDataDir + '/fb-tst.json'),
+    () => prepareData ('acc', csvFile, buildDir + '/fb-acc.json', buildLatestDataDir + '/fb-acc.json'),
+    () => prepareData ('prd', csvFile, buildDir + '/fb-prd.json', buildLatestDataDir + '/fb-prd.json'),
     () => buildDockerImage (),
   ))
 }
 
 const deploy = (env) => lets (
-  () => DOCKER_IMAGE + ':latest',
-  () => DOCKER_IMAGE + ':' + env,
+  () => dockerImage + ':latest',
+  () => dockerImage + ':' + env,
   (from, to) => cmdP ('docker', 'image', 'tag', from, to),
 )
 

@@ -1,3 +1,11 @@
+# --- note that the star is a wildcard for sudo, not for the shell; in other
+# words:
+
+#     # --- works
+#     /bin/rm -rf /path/to/cache/dir/tst/some-arbitrary-file works, as
+#     # --- also works
+#     /bin/rm -rf /path/to/cache/dir/tst/*
+
 <user/%group>	ALL = NOPASSWD: /bin/rm -rf <nginx-cache-dir>/tst/*
 <user/%group>	ALL = NOPASSWD: /bin/rm -rf <nginx-cache-dir>/acc/*
 <user/%group>	ALL = NOPASSWD: /bin/rm -rf <nginx-cache-dir>/prd/*

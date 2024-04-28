@@ -10,21 +10,22 @@ import fsP from 'node:fs/promises'
 
 import { then, recover, rejectP, resolveP, } from 'alleycat-js/es/async'
 import { decorateRejection, toString, } from 'alleycat-js/es/general'
+import configure from 'alleycat-js/es/configure'
 
 import { start as startBuild, } from './build.mjs'
-import { info, warn, } from './io.mjs'
+import { config, } from './config.mjs'
+import { cmdP, info, warn, } from './io.mjs'
 import { chomp, watchDir, } from './util.mjs'
 
-const goPath = ['/tmp', 'go']
-const uploadDir = '/home/upload'
+const configTop = configure.init (config ())
+const { cmdRmUpload, goPath, uploadDir, } = configTop.gets (
+  'cmdRmUpload',
+  'goPath', 'uploadDir',
+)
 
 const trigger = (sourceDesc, zipPath, removeFile=null) => {
   info (`triggered by ${sourceDesc}`)
-  const cleanup = (file) => tryCatch (
-    () => info ('removed', file),
-    warn << decorateRejection ([file] | sprintfN ('Unable to remove %s: ')),
-    () => fs.unlinkSync (file),
-  )
+  const cleanup = (file) => cmdP (... cmdRmUpload (file))
   return startBuild (zipPath)
   | then (() => removeFile && cleanup (removeFile))
   | recover (rejectP << decorateRejection ('Build failed: '))

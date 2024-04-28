@@ -1,4 +1,5 @@
 daemon/lib
+daemon/src/config.mjs
 build
 
 fb-site-config/config.mjs
