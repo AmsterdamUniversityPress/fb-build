@@ -2,7 +2,7 @@
 
 import {
   pipe, compose, composeRight,
-  split, map, ifOk,
+  split, map, ifOk, die,
 } from 'stick-js/es'
 
 import fsP from 'node:fs/promises'
@@ -11,12 +11,13 @@ import yargsMod from 'yargs'
 
 import { then, recover, rejectP, resolveP, } from 'alleycat-js/es/async'
 import { decorateRejection, toString, } from 'alleycat-js/es/general'
+import { isEmptyString, } from 'alleycat-js/es/predicate'
 import configure from 'alleycat-js/es/configure'
 
 import { start as startBuild, deploy, } from './build.mjs'
 import { config, } from './config.mjs'
 import { cmdP, error, info, warn, } from './io.mjs'
-import { chomp, seqP, watchDir, } from './util.mjs'
+import { chomp, delayP, seqP, thenTap, watchDir, } from './util.mjs'
 
 const configTop = configure.init (config ())
 const { cmdRmUpload, goPath, uploadDir, } = configTop.gets (
@@ -57,8 +58,10 @@ const startWatchers = () => {
   watchDir (goDir, {
     created: (goFilename, goFullpath) => {
       if (goFilename !== goFile) return
-      fsP.readFile (goFullpath)
+      delayP (500)
+      | then (() => fsP.readFile (goFullpath))
       | then (chomp << toString)
+      | thenTap ((zipPath) => isEmptyString (zipPath) && die ('Zip path is empty'))
       | then ((zipPath) => trigger ('go-file', zipPath, goFullpath))
       | recover ((e) => warn ('Build (trigger=go-file) failed:', e.message || e))
     },

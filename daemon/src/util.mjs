@@ -2,7 +2,7 @@ import {
   pipe, compose, composeRight,
   dot1, whenPredicate, ne,
   map, noop, condS, eq, guard, die, otherwise, ifTrue,
-  recurry, always, ifOk, id,
+  recurry, always, ifOk, id, tap,
 } from 'stick-js/es'
 
 import fs from 'node:fs'
@@ -90,4 +90,8 @@ export const lookupOrDie = recurry (3) (
 )
 export const lookupOnOrDie = recurry (3) (
   (msg) => (o) => (k) => lookupOrDie (msg, k, o),
+)
+
+export const thenTap = recurry (2) (
+  (f) => then (tap (f)),
 )
