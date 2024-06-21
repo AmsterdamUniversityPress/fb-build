@@ -12,7 +12,7 @@ RUN apt update
 
 RUN apt install --no-install-recommends -y \
   python3 nodejs git nginx redis \
-  procps curl vim-nox aptitude redis-tools
+  procps curl vim-nox aptitude redis-tools sqlite3
 
 # --- enable yarn
 RUN corepack enable
@@ -45,3 +45,5 @@ COPY functions.bash /
 COPY start.sh /start.sh
 
 CMD ["/start.sh"]
+
+# ex: ft=dockerfile
