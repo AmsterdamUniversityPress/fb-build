@@ -7,11 +7,17 @@ bindir=$(realpath "$(dirname "$0")")
 
 . "$bindir"/functions.bash
 
-USAGE="Usage: $0"
+USAGE="Usage: $0 env [...env]"
+
+if [ $# = 0 ]; then
+  error "$USAGE"
+fi
 
 go() {
-  local env
-  for env in tst acc prd; do
-    cmd docker image tag fb-main:{latest,"$env"}
-  done
-}; go
+  local env=$1
+  cmd docker image tag fb-main:{latest,"$env"}
+}
+
+for env in "$@"; do
+  go "$env"
+done
