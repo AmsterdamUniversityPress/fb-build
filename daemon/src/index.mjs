@@ -25,6 +25,8 @@ const { cmdRmUpload, goPath, uploadDir, } = configTop.gets (
   'goPath', 'uploadDir',
 )
 
+const REMOVE_UPLOADS = false
+
 const yargs = yargsMod
   .usage ('Usage: node $0 [options]')
   .option ('deploy-only', {
@@ -46,7 +48,7 @@ const trigger = (sourceDesc, zipPath, removeFile=null) => {
   info (`triggered by ${sourceDesc}`)
   const cleanup = (file) => cmdP (... cmdRmUpload (file))
   return startBuild (zipPath)
-  | then (() => removeFile && cleanup (removeFile))
+  | then (() => REMOVE_UPLOADS && removeFile && cleanup (removeFile))
   | recover (rejectP << decorateRejection ('Build failed: '))
 }
 
