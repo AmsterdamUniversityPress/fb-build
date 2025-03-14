@@ -16,7 +16,7 @@ import { blue, } from 'alleycat-js/es/io'
 import { isEmptyString, } from 'alleycat-js/es/predicate'
 
 import { config, } from './config.mjs'
-import { cmdP, cmdPCwd, cmdPOptsFull, cmd, info, ls, magenta, mkdirExistsOkP, warn, yellow, } from './io.mjs'
+import { cmdP, cmdPCwd, cmdPOptsFull, cmd, info, ls, magenta, mkdirExistsOkP, warn, green, yellow, } from './io.mjs'
 import { __dirname, recoverFail, regardless, seqP, } from './util.mjs'
 
 const configTop = configure.init (config ())
@@ -157,7 +157,7 @@ export const start = (zipPath) => state.current | cata ({
     })
     | then (() => info ('build completed successfully, deploying'))
     | then (() => deploy ('tst'))
-    | then (() => info ('all done!'))
+    | then (() => info ([green (zipPath)] | sprintfN ('all done! (finished processing %s)')))
     | regardless (() => toIdle ())
     | recoverFail ('Aborting: ')
 

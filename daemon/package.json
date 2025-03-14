@@ -18,5 +18,6 @@
     "fish-lib": "^0.10.5",
     "stick-js": "^0.5.2",
     "yargs": "^15.3.1"
-  }
+  },
+  "main": "lib/index.mjs"
 }
