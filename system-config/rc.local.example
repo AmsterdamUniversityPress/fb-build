@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+
+set -e
+set -o pipefail
+
+bindir=$(realpath "$(dirname "$0")")
+
+user=xxx
+path=xxx
+
+cmd() {
+  echo "* $@"
+  "$@"
+}
+
+trim() {
+  local x=$1
+  local y=$x
+  y=$(echo "$y" | sed 's,^\s\+,,')
+  y=$(echo "$y" | sed 's,\s\+$,,')
+  echo -n "$y"
+}
+
+scr-kill() {
+  local user=$1
+  local str=$2
+  local pid=$(sudo -Hu "$user" screen -ls | egrep "[0-9]+\\.$str[[:space:]]" | egrep -o "	[0-9]+")
+  if [ -n "$pid" ]; then
+    pid=$(trim "$pid")
+    cmd kill "$pid"
+  fi
+}
+
+scrs-kill() {
+  local i
+  local user=$1; shift
+  for i in "$@"; do
+    scr-kill "$user" "$i"
+  done
+}
+
+redirects() {
+  cmd rm -f /tmp/rc-local-out
+  exec 3>&1
+  exec 1>>/tmp/rc-local-out
+  exec 2>>/tmp/rc-local-out
+  tail >&3 -f /tmp/rc-local-out &
+}
+
+start-daemon() {
+  cmd sudo -Hu "$user" screen -dmS daemon "$path"
+}
+
+start-site() {
+  local i
+  local j
+  for i in tst acc prd; do
+    for j in main search; do
+      cmd docker start fb-"$j"-"$i" || true
+    done
+  done
+}
+
+redirects
+scrs-kill "$user" daemon
+start-daemon
+start-site
