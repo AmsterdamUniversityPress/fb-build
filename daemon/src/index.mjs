@@ -79,8 +79,8 @@ const startWatchers = () => {
 }
 
 opt.deployOnly | ifOk (
-  (envs) => seqP (envs | split (',') | map (
-    (env) => deploy (env)
+  (envs) => seqP (... envs | split (',') | map (
+    (env) => () => deploy (env)
     | recover (error << decorateRejection ('Deploy failed for ' + env, ': '))
   )),
   () => {
