@@ -24,7 +24,7 @@ export const config = () => {
     buildDir: pathJoin (rootDir, 'build'),
     // --- be sure to add the sudo commands to sudoers (use * for arbitrary
     // arguments)
-    cmdIngest: 'fb-ingest',
+    cmdIngest: '/path/to/fb-ingest',
     cmdRmUpload: (path) => ['sudo', 'rm', '-f', path],
     cmdClearNginxCache: (env) => lets (
       () => env | lookupOnOrDie ('bad env', nginxCache),
