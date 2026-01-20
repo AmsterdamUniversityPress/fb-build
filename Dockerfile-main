@@ -17,9 +17,11 @@ RUN apt install --no-install-recommends -y \
 # --- enable yarn
 RUN corepack enable
 
-RUN git clone https://github.com/AmsterdamUniversityPress/fb-site.git /fb-site
+RUN git clone https://gitlab.com/alleycatcc/fb-site /fb-site
 
-# --- keep for now, though not currently useful
+# --- when building we pass the current epoch time in as CACHEBUST, to
+# ensure no caching after this line (otherwise `git checkout deploy`
+# would get cached and wouldn't work)
 ARG CACHEBUST
 RUN echo "$CACHEBUST"
 
