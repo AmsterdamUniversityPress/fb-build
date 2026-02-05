@@ -2293,7 +2293,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint@npm:^9.22.0":
+"eslint@npm:^9.39.2":
   version: 9.39.2
   resolution: "eslint@npm:9.39.2"
   dependencies:
@@ -3920,7 +3920,7 @@ __metadata:
     babel-plugin-alleycat-stick-transforms: "npm:^0.9.0"
     bilby: "npm:^0.0.2"
     daggy: "npm:^1.5.0"
-    eslint: "npm:^9.22.0"
+    eslint: "npm:^9.39.2"
     eslint-plugin-import: "npm:^2.29.1"
     fish-lib: "npm:^0.10.5"
     stick-js: "npm:^0.5.2"
