@@ -19,5 +19,8 @@
     "stick-js": "^0.5.2",
     "yargs": "^15.3.1"
   },
-  "main": "lib/index.mjs"
+  "main": "lib/index.mjs",
+  "resolutions": {
+    "tar": "^7.5.7"
+  }
 }
