@@ -25,11 +25,13 @@ RUN git clone https://gitlab.com/alleycatcc/fb-site /fb-site
 ARG CACHEBUST
 RUN echo "$CACHEBUST"
 
-# RUN cd /fb-site && git pull && git submodule update --init --recursive && git reset --hard c08f94d
 RUN cd /fb-site && git pull && git submodule update --init --recursive && git checkout deploy
 RUN cd /fb-site && yarn
 
-COPY fb-site-config/config.mjs /fb-site/backend/src/config.mjs
+COPY fb-site-config/config-dev.mjs /fb-site/backend/src/config-dev.mjs
+COPY fb-site-config/config-tst.mjs /fb-site/backend/src/config-tst.mjs
+COPY fb-site-config/config-acc.mjs /fb-site/backend/src/config-acc.mjs
+COPY fb-site-config/config-prd.mjs /fb-site/backend/src/config-prd.mjs
 
 RUN cd /fb-site && bin/build-backend
 

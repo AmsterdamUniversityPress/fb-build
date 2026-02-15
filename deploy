@@ -11,6 +11,9 @@ USAGE="Usage: $0 env [...env]"
 
 if [ $# = 0 ]; then
   error "$USAGE"
+elif [ $# = 1 -a "$1" = -h ]; then
+  info "$USAGE"
+  exit 0
 fi
 
 go() {
